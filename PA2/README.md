@@ -1,1 +1,1 @@
-## Homework (Progtest) tasks for _Programming and Algorithmics 2_ course
+## Homework (Progtest) tasks in the _Programming and Algorithmics 2_ course
