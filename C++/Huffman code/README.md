@@ -3,6 +3,8 @@ The task was to create a set of C++ functions that can decompress an input file 
 
 **You can find more about this task in the "details.pdf" file. (IN CZECH)**
 
+There are example inputs and outputs for testing in the folder "tests".
+
 ## Commands
 - **make (make compile)** - compiles the program
 - **make run** - compiles the program and runs it
