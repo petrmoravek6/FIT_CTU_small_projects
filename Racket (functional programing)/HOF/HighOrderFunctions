@@ -1,0 +1,221 @@
+#lang racket
+
+;importing testing functions from PPA github
+(require "assert.rkt")
+
+;----------------------------------------------------------------------------------
+;FOLD from right
+(define (my-foldr lst foo init)
+  (if (null? lst)
+      init
+      (foo (car lst) (my-foldr (cdr lst) foo init))))
+;----------------------------------------------------------------------------------
+;FOLD from left
+(define (my-foldl lst foo init)
+  (if (null? lst)
+      init
+      (my-foldl (cdr lst) foo (foo init (car lst)))))
+;----------------------------------------------------------------------------------
+;FOLD tree
+(define (my-foldtree tree foo init)
+  (if (null? tree)
+      init
+      (apply foo (cons
+                    (car tree)
+                    ;forech e : cdr {myfoldtree e foo init}
+                    (my-foldr
+                      (cdr tree)
+                      (lambda (e res) (cons (my-foldtree e foo init) res))
+                      null)))))
+;testing fold-tree
+(assert-equal (my-foldtree
+                '()
+                +
+                0) 0)
+(assert-equal (my-foldtree
+                '()
+                +
+                42) 42)
+(assert-equal (my-foldtree
+                '(1 (2 (3 (4 () () ()) () ()) () ()) () ())
+                +
+                0) 10)
+(assert-equal (my-foldtree
+                '(1 (2 () () ()) () (3 () () (4 () () ())))
+                +
+                0) 10)
+(assert-equal (my-foldtree
+                '(1 (2 (3 (4 () ()) ()) ()) ())
+                +
+                0) 10)
+(assert-equal (my-foldtree
+                '(1 (2 (3 (4 ()))))
+                +
+                0) 10)
+(let ([ tree '(1 (2 (3 (4 () () ()) () ()) () ()) () ()) ])
+  (assert-equal (my-foldtree
+                   tree
+                   min
+                   (car tree)) 1))
+(let ([ tree '(1 (2 () () ()) () (3 () () (4 () () ()))) ])
+  (assert-equal (my-foldtree
+                   tree
+                   min
+                   (car tree)) 1))
+(assert-equal (my-foldtree
+                '(1 (2 (3 (4 () () ()) () ()) () ()) () ())
+                *
+                1) 24)
+;----------------------------------------------------------------------------------
+;MAP
+;Returnes a list of values that are returned from function "foo"
+;for every element from list "lst".
+(define (my-map lst foo)
+  (my-foldr lst
+            (lambda (e res) (cons (foo e) res))
+            null))
+;testing map
+(assert-equal (my-map '() (lambda (e) (+ e 1))) '())
+(assert-equal (my-map '() (lambda (e) (* e e))) '())
+(assert-equal (my-map '(1) (lambda (e) (+ e 1))) '(2))
+(assert-equal (my-map '(1 2 3 4 5 6) (lambda (e) (+ e 1))) '(2 3 4 5 6 7))
+(assert-equal (my-map '(1 2 3 4 5 6) (lambda (e) (* e e))) '(1 4 9 16 25 36))
+(assert-equal (my-map '("b" "c") (lambda (e) (string-append e "x"))) '("bx" "cx"))
+;----------------------------------------------------------------------------------
+;FILTER
+;Returnes a list of all elements from list "lst" for
+;which a function "foo" returnes #t.
+(define (my-filter lst foo)
+  (my-foldr lst
+            (lambda (e res) (if (foo e)
+                               (cons e res)
+                               res))
+            null))
+;testing filter
+;filters out negative numbers
+(assert-equal (my-filter
+               '(-3 -2 -1 0 1 2 3 4 5)
+               (lambda (e) (> e -1))) '(0 1 2 3 4 5))
+(assert-equal (my-filter '() (lambda (e) (if (> e -1) #t #f))) '())
+(assert-equal (my-filter '(1) (lambda (e) (if (> e -1) #t #f))) '(1))
+(assert-equal (my-filter '(-1) (lambda (e) (if (> e -1) #t #f))) '())
+;filters out odd numbers
+(assert-equal (my-filter
+               '(1 2 3 4 5 6 7 8 9 10)
+               (lambda (e) (if (equal? 0 (modulo e 2)) #t #f))) '(2 4 6 8 10))
+;filters out "a" strings from list of strings
+(assert-equal (my-filter
+               '("a" "b" "c" "abc" "a")
+               (lambda (s) (if (string=? s "a") #f #t))) '("b" "c" "abc"))
+;----------------------------------------------------------------------------------
+;REDUCE
+;Takes first two elements from list "lst" (if there is only one element,
+;it returnes it)and applies a function "foo" to them.
+;The returned value is then passed as an argument
+;alongside next element from lst to function foo until last element.
+(define (my-reduce lst foo)
+  (if (null? lst)
+      null
+      (my-foldl (cdr lst) foo (car lst))))
+;testing reduce
+(assert-equal (my-reduce '(0 -1 1 -2 2 -3 3) min) -3)
+(assert-equal (my-reduce '(0 -1 1 -2 2 -3 3) max) 3)
+(assert-equal (my-reduce '(0 1 2 3 4 5) +) 15)
+(assert-equal (my-reduce '(1 2 3 4 5) *) 120)
+(assert-equal (my-reduce '() *) null)
+(assert-equal (my-reduce '(2) min) 2)
+;----------------------------------------------------------------------------------
+;QUICKSORT
+(define (my-quicksort lst lt-comp)
+  (cond
+    ((null? lst) lst)
+    (#t (let (
+           [pivot (first lst)]
+           ;compare function greater than
+           [gt-comp (lambda (l r) (not (or (lt-comp l r) (equal? l r))))])
+       ;appending greater elements than pivot to same elements as pivot to
+       ;lower elements than pivot to one list which is than returned
+       (append
+        (my-quicksort (filter (lambda (x) (lt-comp x pivot)) lst) lt-comp)
+        (my-filter lst (lambda (x) (equal? x pivot)))
+        (my-quicksort (filter (lambda (x) (gt-comp x pivot)) lst) lt-comp))))))
+;testing quicksort
+(assert-equal (my-quicksort '() <) '())
+(assert-equal (my-quicksort '(1) <) '(1))
+(assert-equal (my-quicksort '(2 1) <) '(1 2))
+(assert-equal (my-quicksort '(1 2) <) '(1 2))
+(assert-equal (my-quicksort '(1 2 3) <) '(1 2 3))
+(assert-equal (my-quicksort '(3 2 1) <) '(1 2 3))
+(assert-equal (my-quicksort '(1 3 2) <) '(1 2 3))
+(assert-equal (my-quicksort '(2 1 3) <) '(1 2 3))
+(assert-equal (my-quicksort '(2 3 1) <) '(1 2 3))
+(assert-equal (my-quicksort '(2 1) >) '(2 1))
+(assert-equal (my-quicksort '(1 2) >) '(2 1))
+(assert-equal (my-quicksort '(1 2 3) >) '(3 2 1))
+(assert-equal (my-quicksort '(3 2 1) >) '(3 2 1))
+(assert-equal (my-quicksort '(1 3 2) >) '(3 2 1))
+(assert-equal (my-quicksort '(2 1 3) >) '(3 2 1))
+(assert-equal (my-quicksort '(2 3 1) >) '(3 2 1))
+(assert-equal
+ (my-quicksort '(3 5 1 -1 2 -2 -5 -3 4 -4 0) <)
+ '(-5 -4 -3 -2 -1 0 1 2 3 4 5))
+(assert-equal
+ (my-quicksort '(3 5 1 -1 2 -2 -5 -3 4 -4 0) >)
+ (reverse '(-5 -4 -3 -2 -1 0 1 2 3 4 5)))
+(assert-equal
+ (my-quicksort '(6 1 3 -1 2 8 8 5 4 9 9 7 4 0 -1 2 7 1 4 3 9 5 2 8 6 5 6 7 0 1) <)
+ '(-1 -1 0 0 1 1 1 2 2 2 3 3 4 4 4 5 5 5 6 6 6 7 7 7 8 8 8 9 9 9))
+;----------------------------------------------------------------------------------
+;auxiliary functions for mergesort
+;splits list in half and returnes list of the two halves
+(define (my-split lst)
+  (my-split-aux lst null null 1))
+(define (my-split-aux lst l1 l2 whichList)
+  (cond
+    ((null? lst)    (cons l1 l2))
+    ((equal? whichList 1) (my-split-aux (cdr lst) (cons (car lst) l1) l2 2))
+    ((equal? whichList 2) (my-split-aux (cdr lst) l1 (cons (car lst) l2) 1))))
+;merges two sorted lists into one sorted list
+(define (my-merge l1 l2 foo)
+  (cond
+    ((null? l1) l2)
+    ((null? l2) l1)
+    ((foo (car l1) (car l2)) (cons (car l1) (my-merge (cdr l1) l2 foo)))
+    (#t                    (cons (car l2) (my-merge l1 (cdr l2) foo)))))
+;MERGESORT
+(define (my-mergesort lst foo)
+  (cond
+    ((null? lst) null) ; list length is 0
+    ((null? (cdr lst)) lst) ; list length is 1 thus we cannot split it in two
+    (#t     (let [(split-list (my-split lst))]
+              (my-merge
+               (my-mergesort (car split-list) foo)
+               (my-mergesort (cdr split-list) foo)
+               foo)))))
+;testing mergesort
+(assert-equal (my-mergesort '() <) '())
+(assert-equal (my-mergesort '(1) <) '(1))
+(assert-equal (my-mergesort '(2 1) <) '(1 2))
+(assert-equal (my-mergesort '(1 2) <) '(1 2))
+(assert-equal (my-mergesort '(1 2 3) <) '(1 2 3))
+(assert-equal (my-mergesort '(3 2 1) <) '(1 2 3))
+(assert-equal (my-mergesort '(1 3 2) <) '(1 2 3))
+(assert-equal (my-mergesort '(2 1 3) <) '(1 2 3))
+(assert-equal (my-mergesort '(2 3 1) <) '(1 2 3))
+(assert-equal (my-mergesort '(2 1) >) '(2 1))
+(assert-equal (my-mergesort '(1 2) >) '(2 1))
+(assert-equal (my-mergesort '(1 2 3) >) '(3 2 1))
+(assert-equal (my-mergesort '(3 2 1) >) '(3 2 1))
+(assert-equal (my-mergesort '(1 3 2) >) '(3 2 1))
+(assert-equal (my-mergesort '(2 1 3) >) '(3 2 1))
+(assert-equal (my-mergesort '(2 3 1) >) '(3 2 1))
+(assert-equal
+ (my-mergesort '(3 5 1 -1 2 -2 -5 -3 4 -4 0) <)
+ '(-5 -4 -3 -2 -1 0 1 2 3 4 5))
+(assert-equal
+ (my-mergesort '(3 5 1 -1 2 -2 -5 -3 4 -4 0) >)
+ (reverse '(-5 -4 -3 -2 -1 0 1 2 3 4 5)))
+(assert-equal
+ (my-mergesort '(6 1 3 -1 2 8 8 5 4 9 9 7 4 0 -1 2 7 1 4 3 9 5 2 8 6 5 6 7 0 1) <)
+ '(-1 -1 0 0 1 1 1 2 2 2 3 3 4 4 4 5 5 5 6 6 6 7 7 7 8 8 8 9 9 9))
+;----------------------------------------------------------------------------------
